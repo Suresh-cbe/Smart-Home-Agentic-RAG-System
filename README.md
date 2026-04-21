@@ -107,6 +107,10 @@ POST /query
   "confidence_score": 0.95
 }
 
+
+🚀 Quick install
+pip install -r requirements.txt
+
 🔍 Key Components
 🤖 Agent (agent.py)
 Tool selection (Cypher vs Semantic)
