@@ -1,3 +1,6 @@
+<img width="1536" height="1024" alt="Architect" src="https://github.com/user-attachments/assets/50af7e1b-5ded-48e7-8385-0ccdc1db65f1" />
+
+
 # 🏠 Smart Home Agentic RAG System
 
 An advanced **Agentic RAG (Retrieval-Augmented Generation)** system for querying a smart home environment using **Neo4j (Graph DB)** and **Google Gemini (LLM)**.
