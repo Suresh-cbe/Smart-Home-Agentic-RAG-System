@@ -1,105 +1,159 @@
 import os
-import json
-from google import genai
-from google.genai import types
-from app.tools import TOOLS
+from typing import Dict, Any, List
 from dotenv import load_dotenv
+from google import genai
+from app.database import Neo4jManager
+from app.tools import execute_cypher, semantic_search_tool
 
 load_dotenv()
 
-# Initialize the new client
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+db = Neo4jManager()
 
-# Create the model
-system_instruction = """
-You are a "Smart Home Logic Engine", a senior backend engineer and AI architect. 
-You are tasked with answering questions about a smart home environment using a Neo4j graph database.
-
-You have access to tools to query the database:
-- `execute_cypher`: Write and execute Cypher queries. Prefer this for pathfinding, finding relationships, or specific data retrieval.
-- `semantic_device_search`: Use this to find devices based on semantic descriptions.
-- `get_device_status`: Retrieve the exact state of a device by its ID.
-
-Important Guidelines:
-1. Prefer `execute_cypher` to explore relationships (e.g., what controls what, what is in which room).
-2. If `execute_cypher` returns an error (e.g., syntax error or node not found), use the error message to correct your query and try again.
-3. If you do not know the exact device ID, you can use `semantic_device_search` to find it first.
-4. Once you have gathered sufficient information, synthesize a helpful, concise answer.
-"""
-
-# Configure tool and system instructions
-config = types.GenerateContentConfig(
-    system_instruction=system_instruction,
-    tools=TOOLS,
-    temperature=0.0
-)
+TOOLS = {
+    "cypher": execute_cypher,
+    "semantic": semantic_search_tool
+}
 
 
 class Agent:
     def __init__(self):
-        # We start a chat session. Function calling loop is native via automatic_function_calling if available,
-        # but with google-genai we often loop manually or rely on the SDK's chat feature. 
-        # For agent loop, we'll manually handle the loop to capture the trace correctly with the new SDK.
+        self.reasoning_trace: List[Dict[str, Any]] = []
+
+    # -----------------------------
+    # Utilities
+    # -----------------------------
+    def _log(self, action, data):
+        self.reasoning_trace.append({"action": action, **data})
+
+    def _clean_cypher(self, query):
+        return query.replace("```", "").replace("cypher", "").strip()
+
+    def _is_safe(self, query):
+        forbidden = ["DELETE", "DROP", "REMOVE", "SET", "CREATE"]
+        return not any(f in query.upper() for f in forbidden)
+
+    def _format_result(self, result):
+        if isinstance(result, list) and result:
+            return ", ".join(str(v) for v in result[0].values())
+        return "No data available"
+
+    def _verify(self, answer, context):
+        return context.lower() in answer.lower()
+
+    # -----------------------------
+    # Tool Decision
+    # -----------------------------
+    def _decide_tool(self, query):
+        if any(x in query.lower() for x in ["describe", "about", "details"]):
+            return "semantic"
+        return "cypher"
+
+    # -----------------------------
+    # Generate Cypher
+    # -----------------------------
+    def _generate_cypher(self, query):
+        prompt = f"""
+Convert to Cypher.
+
+Schema:
+Device(type, location, state)
+
+Rules:
+- type: Thermostat | Light | Sensor
+- location: Living Room | Kitchen | Bedroom
+- Only return Cypher
+
+Question:
+{query}
+"""
+        res = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=prompt
+        )
+        return self._clean_cypher(res.text)
+
+    # -----------------------------
+    # Main Flow
+    # -----------------------------
+    def get_response(self, user_query: str) -> Dict[str, Any]:
         self.reasoning_trace = []
-        self.chat = client.chats.create(model="gemini-1.5-flash", config=config)
 
-    def get_response(self, user_query: str) -> dict:
-        self.reasoning_trace = [] # Reset trace for new query
-        
-        # We manually process to gather the trace
-        self.reasoning_trace.append({"action": "user_query", "text": user_query})
-        
-        # Send message to model. The new SDK chat handles function calling automatically if tools are provided
-        # but capturing the exact trace requires inspecting the chat's messages.
-        
-        # We will loop to handle function calls manually to capture the trace
-        # The new SDK's chats.send_message handles history, but we need to intercept tool calls for tracing.
-        # Alternatively, we can let the SDK handle it and inspect the history afterwards if it supports auto-calling.
-        
-        # In the new SDK, chat handles tools if we use them, but to capture the trace we can inspect the response.
-        # Let's send the message. 
-        response = self.chat.send_message(user_query)
+        try:
+            self._log("user_query", {"text": user_query})
 
-        # Iterate over the chat's last few messages (from the current turn) to build the trace
-        # With google-genai, the chat object holds history.
-        
-        # Let's rebuild the trace from the chat history
-        # We look at the messages in self.chat.get_history() (or equivalent)
-        
-        # To be robust, we'll iterate through the history and look for function calls
-        for message in self.chat.get_history():
-             # Check if it's a model message with parts
-             if message.role == 'model' and getattr(message, 'parts', None):
-                 for part in message.parts:
-                     if hasattr(part, 'function_call') and part.function_call:
-                         # It's a function call
-                         args_dict = dict(part.function_call.args) if part.function_call.args else {}
-                         self.reasoning_trace.append({
-                             "action": "tool_call",
-                             "tool": part.function_call.name,
-                             "arguments": args_dict
-                         })
-                     elif hasattr(part, 'text') and part.text:
-                         self.reasoning_trace.append({
-                             "action": "model_response",
-                             "text": part.text
-                         })
-             elif message.role == 'user' and getattr(message, 'parts', None):
-                 for part in message.parts:
-                     if hasattr(part, 'function_response') and part.function_response:
-                         # It's a function response
-                         resp_dict = dict(part.function_response.response) if part.function_response.response else {}
-                         self.reasoning_trace.append({
-                             "action": "tool_response",
-                             "tool": part.function_response.name,
-                             "response": resp_dict
-                         })
-        
-        final_answer = response.text
-        
-        return {
-            "answer": final_answer,
-            "reasoning_trace": self.reasoning_trace,
-            "retrieved_context": "Context was fetched via tools. See reasoning_trace.",
-            "confidence_score": 0.95
-        }
+            tool = self._decide_tool(user_query)
+            self._log("tool_selected", {"tool": tool})
+
+            # 🔥 Multi-step retry loop
+            result = None
+            cypher = None
+
+            for _ in range(2):
+                if tool == "cypher":
+                    cypher = self._generate_cypher(user_query)
+                    self._log("generated_cypher", {"query": cypher})
+
+                    if not self._is_safe(cypher):
+                        raise Exception("Unsafe query")
+
+                    result = TOOLS["cypher"](db, cypher)
+
+                else:
+                    result = TOOLS["semantic"](db, user_query)
+
+                if result:
+                    break
+
+            context = self._format_result(result)
+            self._log("db_result", {"result": context})
+
+            # 🔥 No hallucination guard
+            if context == "No data available":
+                return {
+                    "answer": "No data available.",
+                    "reasoning_trace": self.reasoning_trace,
+                    "retrieved_context": context,
+                    "confidence_score": 0.2
+                }
+
+            # 🔥 Final Answer
+            prompt = f"""
+Answer using ONLY data.
+
+Question:
+{user_query}
+
+Data:
+{context}
+"""
+            res = client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt
+            )
+
+            answer = res.text.strip()
+
+            if not self._verify(answer, context):
+                answer = "Unable to verify answer."
+                confidence = 0.3
+            else:
+                confidence = 0.95
+
+            self._log("model_response", {"text": answer})
+
+            return {
+                "answer": answer,
+                "reasoning_trace": self.reasoning_trace,
+                "retrieved_context": context,
+                "confidence_score": confidence
+            }
+
+        except Exception as e:
+            self._log("error", {"message": str(e)})
+            return {
+                "answer": "Request failed safely.",
+                "reasoning_trace": self.reasoning_trace,
+                "retrieved_context": "",
+                "confidence_score": 0.0
+            }

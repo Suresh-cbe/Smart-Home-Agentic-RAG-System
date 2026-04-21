@@ -1,68 +1,155 @@
-🏠 Smart Home Agentic RAG (Gemini + Neo4j)
+# 🏠 Smart Home Agentic RAG System
 
-Project ID: 20260211-1
-Developed by: Suresh Rajendran | Coimbatore, TN
+An advanced **Agentic RAG (Retrieval-Augmented Generation)** system for querying a smart home environment using **Neo4j (Graph DB)** and **Google Gemini (LLM)**.
 
-Vanakkam! This is a high-performance Agentic RAG system built to manage and query smart home ecosystems. Instead of just searching for text, this system uses a Neo4j Knowledge Graph to understand how devices actually relate to each other (like which sensor triggers which light) and uses Gemini 1.5 Flash as the "brain" to reason through complex queries.
+This system allows users to ask natural language questions and get **accurate, grounded responses** based on real device data.
 
-Built with the Google AI SDK (ADK)—clean, fast, and no unnecessary LangGraph overhead.
+---
 
-🛠 What's Under the Hood?
-The Brain: Gemini 1.5 Flash (Handling reasoning and function calling).
+## 🚀 Features
 
-The Memory: Neo4j Graph Database (Storing device states and relationships).
+- ✅ Natural Language Query API (FastAPI)
+- ✅ Graph-based retrieval using Neo4j
+- ✅ Semantic search using vector embeddings
+- ✅ Hybrid RAG (Cypher + Vector Search)
+- ✅ Tool-based agent architecture
+- ✅ Multi-step reasoning loop
+- ✅ Rule-based guardrails (safety + validation)
+- ✅ Explainable reasoning trace
+- ✅ Confidence scoring
+- ✅ Dockerized setup (API + Database)
 
-The API: FastAPI
+---
 
-Search Style: Hybrid RAG (Vector search for meanings + Cypher queries for relationships).
+## 🧠 Architecture
 
-🚀 Getting Started (The "Mass" Way)
-Don't sweat the setup. Follow these steps and you'll be up in 5 minutes.
 
-1. Fire up the Database
-I've included a docker-compose.yml. Use it to spin up Neo4j without messing up your local machine.
+User Query
+↓
+Agent (Tool Selection)
+↓
+[Cypher Query] OR [Semantic Search]
+↓
+Neo4j (Graph + Vector Index)
+↓
+Retrieved Context
+↓
+Gemini LLM (Response Generation)
+↓
+Final Answer + Reasoning Trace
 
-Bash
-docker-compose up -d
-2. Setup your Environment
-Copy the .env.example to .env and put your keys in.
 
-Note: Get your Gemini API key from Google AI Studio. It's free and fast.
+---
 
-3. Install Dependencies
-Bash
-pip install -r requirements.txt
-4. Seed the Data
-Before you ask questions, the "house" needs to be built. Run the seeding script to populate 20+ devices and their connections.
+## 🛠 Tech Stack
 
-Bash
-python seed.py
-5. Run the Engine
-Bash
-uvicorn main:app --reload
-📍 Example Queries to Try
-Once the server is running at localhost:8000, hit the /query endpoint. Gemini will decide whether to look at the graph or search descriptions.
+- **Backend**: FastAPI
+- **LLM**: Google Gemini (gemini-2.5-flash-lite)
+- **Database**: Neo4j (Graph + Vector Index)
+- **Embeddings**: gemini-embedding-001
+- **Containerization**: Docker & Docker Compose
+- **Language**: Python 3.11
 
-"What devices are in the bedroom?"
+---
 
-"Which sensors trigger the hallway lights?" (Uses Graph traversal)
+## 📁 Project Structure
 
-"What's the status of the front door lock?" (Direct Tool call)
 
-"What happens when motion is detected in the garage?"
+app/
+├── main.py # FastAPI entry point
+├── agent.py # Core AI agent logic
+├── database.py # Neo4j + embeddings
+├── tools.py # Tool abstraction layer
+├── schemas.py # Request/response models
+data/
+├── seed_db.py # Database seeding
+tests/
+├── test_agent.py # Testing scripts
+.env
+docker-compose.yml
+Dockerfile
+requirements.txt
+README.md
 
-🧠 System Design (How it works)
-Natural Language Input: You ask a question in plain English.
+## ⚙️ Setup Instructions
 
-Function Calling: Gemini looks at the tools I've provided (execute_cypher, semantic_search).
+### 🔹 1. Clone Repository
 
-Reasoning: If you ask "What controls the lights?", Gemini knows it needs to run a Cypher query to find CONTROLS relationships.
+git clone <your-repo-url>
+cd smart-home-agentic-rag
+🔹 2. Create .env file
+GOOGLE_API_KEY=your_api_key
+NEO4J_URI=bolt://neo4j:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
+🔹 3. Run with Docker
+docker-compose up --build
+🔹 4. Access Services
+API Docs (Fast API) → http://localhost:8000/docs
+Neo4j Browser → http://localhost:7474
+🧪 API Usage
+🔹 Endpoint
+POST /query
+🔹 Request
+{
+  "question": "What is the temperature in the living room?"
+}
+🔹 Response
+{
+  "answer": "The temperature in the living room is 72°F.",
+  "reasoning_trace": [
+    "Step 1: Parsed user query",
+    "Step 2: Generated Cypher query",
+    "Step 3: Retrieved data from Neo4j",
+    "Step 4: Generated final response"
+  ],
+  "retrieved_context": "72°F",
+  "confidence_score": 0.95
+}
 
-Data Synthesis: It takes the raw graph data and explains it to you like a human.
+🔍 Key Components
+🤖 Agent (agent.py)
+Tool selection (Cypher vs Semantic)
+Multi-step reasoning loop
+Guardrails & validation
+Response generation
+🗄 Database (database.py)
+Neo4j connection
+Cypher execution
+Vector search (semantic retrieval)
+Embedding generation
+🛠 Tools (tools.py)
+execute_cypher
+semantic_search
+get_device_state
+🛡 Hallucination Prevention
 
-Traceability: Every response comes with a reasoning_trace so you can see exactly how the AI "thought" through the problem.
+The system ensures reliable outputs using:
 
-📝 A Note on the Approach
-I chose the Google SDK over LangGraph for this specific implementation to keep the latency low and the code maintainable. In a real-world Coimbatore startup environment, we value speed and reliability. By using native function calling, the agent is less prone to "looping" and more focused on returning accurate device states.
+✅ Grounded retrieval (Neo4j)
+✅ Rule-based query validation
+✅ No-data fallback handling
+✅ Answer verification layer
+✅ Controlled prompting
+🧪 Testing
 
-Contact: If you run into any issues, you know where to find me—probably at the office in Ultrafly or grabbing a coffee near RS Puram. ☕
+Run:
+
+python tests/test_agent.py
+📦 Docker Setup
+Services
+neo4j → Graph database
+api → FastAPI application
+
+🔥 Example Queries
+What is the temperature in the living room?
+Which devices are in the kitchen?
+Describe devices in the bedroom
+Is any light ON?
+
+🚀 Future Improvements
+Multi-turn conversation memory
+Advanced tool routing
+LangGraph integration (optional)
+Real-time device updates
+UI dashboard

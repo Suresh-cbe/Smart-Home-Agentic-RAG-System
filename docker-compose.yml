@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   neo4j:
@@ -8,12 +8,22 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      - NEO4J_AUTH=neo4j/password
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_memory_heap_max__size=1G
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+
+  api:
+    build: .
+    container_name: smart_home_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - neo4j
+    env_file:
+      - .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   neo4j_data:
