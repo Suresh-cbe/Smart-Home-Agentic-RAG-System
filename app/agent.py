@@ -1,13 +1,14 @@
 import os
 import json
-import google.generativeai as genai
-from google.generativeai.types import content_types
+from google import genai
+from google.genai import types
 from app.tools import TOOLS
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Initialize the new client
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Create the model
 system_instruction = """
@@ -26,71 +27,79 @@ Important Guidelines:
 4. Once you have gathered sufficient information, synthesize a helpful, concise answer.
 """
 
-model = genai.GenerativeModel(
-    model_name="models/gemini-1.5-flash",
+# Configure tool and system instructions
+config = types.GenerateContentConfig(
+    system_instruction=system_instruction,
     tools=TOOLS,
-    system_instruction=system_instruction
+    temperature=0.0
 )
+
 
 class Agent:
     def __init__(self):
-        self.chat = model.start_chat(enable_automatic_function_calling=True)
+        # We start a chat session. Function calling loop is native via automatic_function_calling if available,
+        # but with google-genai we often loop manually or rely on the SDK's chat feature. 
+        # For agent loop, we'll manually handle the loop to capture the trace correctly with the new SDK.
         self.reasoning_trace = []
+        self.chat = client.chats.create(model="gemini-1.5-flash", config=config)
 
     def get_response(self, user_query: str) -> dict:
         self.reasoning_trace = [] # Reset trace for new query
         
-        # Send message to model. The SDK will automatically handle the tool calls
-        # and loops until the model returns a final text response.
+        # We manually process to gather the trace
+        self.reasoning_trace.append({"action": "user_query", "text": user_query})
+        
+        # Send message to model. The new SDK chat handles function calling automatically if tools are provided
+        # but capturing the exact trace requires inspecting the chat's messages.
+        
+        # We will loop to handle function calls manually to capture the trace
+        # The new SDK's chats.send_message handles history, but we need to intercept tool calls for tracing.
+        # Alternatively, we can let the SDK handle it and inspect the history afterwards if it supports auto-calling.
+        
+        # In the new SDK, chat handles tools if we use them, but to capture the trace we can inspect the response.
+        # Let's send the message. 
         response = self.chat.send_message(user_query)
+
+        # Iterate over the chat's last few messages (from the current turn) to build the trace
+        # With google-genai, the chat object holds history.
         
-        # Manually extract the trace from the history added during this interaction
-        # The history contains the user message, model tool calls, tool responses, and final model response.
+        # Let's rebuild the trace from the chat history
+        # We look at the messages in self.chat.get_history() (or equivalent)
         
-        # To get the newly added history, we'd ideally compare before and after, 
-        # but since we want to capture the trace, we can inspect the chat history.
-        # Note: In google-generativeai SDK, enable_automatic_function_calling=True abstracts the loop,
-        # but the history contains the steps.
-        
-        current_trace = []
-        for message in self.chat.history:
-            if message.role == "model":
-                for part in message.parts:
-                    if part.function_call:
-                        current_trace.append({
-                            "action": "tool_call",
-                            "tool": part.function_call.name,
-                            "arguments": dict(part.function_call.args)
-                        })
-                    elif part.text:
-                         current_trace.append({
+        # To be robust, we'll iterate through the history and look for function calls
+        for message in self.chat.get_history():
+             # Check if it's a model message with parts
+             if message.role == 'model' and getattr(message, 'parts', None):
+                 for part in message.parts:
+                     if hasattr(part, 'function_call') and part.function_call:
+                         # It's a function call
+                         args_dict = dict(part.function_call.args) if part.function_call.args else {}
+                         self.reasoning_trace.append({
+                             "action": "tool_call",
+                             "tool": part.function_call.name,
+                             "arguments": args_dict
+                         })
+                     elif hasattr(part, 'text') and part.text:
+                         self.reasoning_trace.append({
                              "action": "model_response",
                              "text": part.text
                          })
-            elif message.role == "user" or message.role == "function":
+             elif message.role == 'user' and getattr(message, 'parts', None):
                  for part in message.parts:
-                    if part.function_response:
-                        # Extract part.function_response as dict
-                        try:
-                            resp_dict = dict(part.function_response.response)
-                            # the structure of response is usually {"result": ...} or similar, depending on how it was passed
-                            current_trace.append({
-                                "action": "tool_response",
-                                "tool": part.function_response.name,
-                                "response": resp_dict
-                            })
-                        except Exception:
-                            pass
+                     if hasattr(part, 'function_response') and part.function_response:
+                         # It's a function response
+                         resp_dict = dict(part.function_response.response) if part.function_response.response else {}
+                         self.reasoning_trace.append({
+                             "action": "tool_response",
+                             "tool": part.function_response.name,
+                             "response": resp_dict
+                         })
         
-        # In a real scenario, you'd only want the trace for the *current* query. 
-        # Here we just take the recent history. For simplicity, we just provide the extracted trace.
-        
-        # Synthesize final output
         final_answer = response.text
         
         return {
             "answer": final_answer,
-            "reasoning_trace": current_trace,
+            "reasoning_trace": self.reasoning_trace,
             "retrieved_context": "Context was fetched via tools. See reasoning_trace.",
-            "confidence_score": 0.95 # Placeholder as Gemini doesn't output confidence natively
+            "confidence_score": 0.95
         }

@@ -1,12 +1,12 @@
 import os
-import google.generativeai as genai
+from google import genai
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Configure Gemini
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 class Neo4jManager:
     def __init__(self):
@@ -34,12 +34,11 @@ class Neo4jManager:
 
     def embed_text(self, text: str) -> list[float]:
         """Generate embedding for text using Gemini text-embedding-004."""
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="retrieval_document"
+        result = client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
         )
-        return result['embedding']
+        return result.embeddings[0].values
 
     def seed_database(self):
         """Seed the Neo4j database with smart home devices and relationships."""
