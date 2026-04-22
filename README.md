@@ -1,8 +1,11 @@
+# Smart-Home-Agentic-RAG-System
+
+[![Smart Home Agentic RAG Demo](https://github.com/user-attachments/assets/8f7914cd-33a4-45fa-8bf2-cfad19d2d809)](https://www.youtube.com/watch?v=FTZyviN9J3M)
+
+---
+
+### 🏗️ System Architecture
 <img width="1536" height="1024" alt="Architect" src="https://github.com/user-attachments/assets/50af7e1b-5ded-48e7-8385-0ccdc1db65f1" />
-
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/FTZvyiN9J3M?si=su-gLTFftCogIXXO" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
 
 # 🏠 Smart Home Agentic RAG System
 
