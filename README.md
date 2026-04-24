@@ -63,15 +63,15 @@ Final Answer + Reasoning Trace
 
 
 app/
-├── main.py # FastAPI entry point
-├── agent.py # Core AI agent logic
-├── database.py # Neo4j + embeddings
-├── tools.py # Tool abstraction layer
-├── schemas.py # Request/response models
+    ├── main.py # FastAPI entry point
+    ├── agent.py # Core AI agent logic
+    ├── database.py # Neo4j + embeddings
+    ├── tools.py # Tool abstraction layer
+    ├── schemas.py # Request/response models
 data/
-├── seed_db.py # Database seeding
+    ├── seed_db.py # Database seeding
 tests/
-├── test_agent.py # Testing scripts
+    ├── test_agent.py # Testing scripts
 .env
 docker-compose.yml
 Dockerfile
@@ -84,16 +84,20 @@ README.md
 
 git clone <your-repo-url>
 cd smart-home-agentic-rag
+
 🔹 2. Create .env file
 GOOGLE_API_KEY=your_api_key
 NEO4J_URI=bolt://neo4j:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
+
 🔹 3. Run with Docker
 docker-compose up --build
+
 🔹 4. Access Services
 API Docs (Fast API) → http://localhost:8000/docs
 Neo4j Browser → http://localhost:7474
+
 🧪 API Usage
 🔹 Endpoint
 POST /query
@@ -119,22 +123,25 @@ POST /query
 pip install -r requirements.txt
 
 🔍 Key Components
+
 🤖 Agent (agent.py)
 Tool selection (Cypher vs Semantic)
 Multi-step reasoning loop
 Guardrails & validation
 Response generation
+
 🗄 Database (database.py)
 Neo4j connection
 Cypher execution
 Vector search (semantic retrieval)
 Embedding generation
+
 🛠 Tools (tools.py)
 execute_cypher
 semantic_search
 get_device_state
-🛡 Hallucination Prevention
 
+🛡 Hallucination Prevention
 The system ensures reliable outputs using:
 
 ✅ Grounded retrieval (Neo4j)
@@ -145,8 +152,8 @@ The system ensures reliable outputs using:
 🧪 Testing
 
 Run:
-
 python tests/test_agent.py
+
 📦 Docker Setup
 Services
 neo4j → Graph database
