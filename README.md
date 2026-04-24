@@ -61,7 +61,6 @@ Final Answer + Reasoning Trace
 
 ## 📁 Project Structure
 
-
 app/
     ├── main.py # FastAPI entry point
     ├── agent.py # Core AI agent logic
